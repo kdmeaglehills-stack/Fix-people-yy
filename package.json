@@ -1,18 +1,625 @@
-{
-  "name": "fix-people-clean",
-  "version": "1.0.0",
-  "main": "server.js",
-  "type": "module",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=20"
-  },
-  "dependencies": {
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "sharp": "^0.33.5",
-    "uuid": "^11.0.5"
-  }
-}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fix People - Magnific</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #101216;
+      --panel: #171b22;
+      --panel2: #202633;
+      --border: #2f3948;
+      --text: #f4f7fb;
+      --muted: #aab4c3;
+      --accent: #76a9ff;
+      --green: #3ddb91;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    header {
+      padding: 22px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 390px minmax(0, 1fr);
+      gap: 18px;
+      padding: 18px;
+    }
+
+    .sidebar,
+    .preview {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 9px;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px;
+      font: inherit;
+    }
+
+    textarea { resize: vertical; }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #07101f;
+    }
+
+    button.secondary {
+      background: #2a3342;
+      color: var(--text);
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .status {
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .canvasWrap {
+      overflow: auto;
+      max-height: 82vh;
+      text-align: center;
+    }
+
+    canvas {
+      max-width: 100%;
+      background: #050607;
+      border-radius: 12px;
+    }
+
+    #groupsPanel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .groupCard {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .groupHeader {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .thumbs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+    }
+
+    .thumbBtn {
+      overflow: hidden;
+      padding: 0;
+      border: 2px solid transparent;
+      background: #000;
+      border-radius: 9px;
+    }
+
+    .thumbBtn.active {
+      border-color: var(--green);
+    }
+
+    .thumbBtn img {
+      width: 100%;
+      height: 78px;
+      object-fit: cover;
+      display: block;
+    }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Fix People - Magnific</h1>
+    <p>Upload one render, detect people, generate rectangular replacement crops, choose options, and download the final image.</p>
+  </header>
+
+  <main class="layout">
+    <section class="sidebar">
+      <div class="card">
+        <label class="label">1. Upload full render</label>
+        <input type="file" id="imageInput" accept="image/png,image/jpeg,image/webp" />
+      </div>
+
+      <div class="card">
+        <label class="label">2. Prompt</label>
+        <textarea id="promptInput" rows="8">Regenerate the people in this architectural visualization crop. Preserve the same camera angle, crop framing, scale, perspective, floor contact, shadows, railing, water, architecture, and surrounding context. Improve the people only: realistic faces, natural eyes, correct hands and fingers, believable clothing folds, accurate body proportions, and natural gestures. Keep the scene photorealistic and do not redesign the environment.</textarea>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <label class="label">Options / group</label>
+          <input type="number" id="optionsCount" min="1" max="6" value="1" />
+        </div>
+        <div class="card">
+          <label class="label">Resolution</label>
+          <select id="resolution">
+            <option value="1K" selected>1K</option>
+            <option value="2K">2K</option>
+            <option value="4K">4K</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <label class="label">Crop padding %</label>
+          <input type="number" id="paddingPercent" min="5" max="100" value="40" />
+        </div>
+        <div class="card">
+          <label class="label">Edge feather px</label>
+          <input type="number" id="featherPixels" min="0" max="160" value="24" />
+        </div>
+      </div>
+
+      <div class="card note">
+        Crop box snaps to the closest supported Nano Banana aspect ratio before generation.
+      </div>
+
+      <div class="grid2">
+        <button id="detectBtn" class="secondary" disabled>Detect People</button>
+        <button id="fixBtn" class="primary" disabled>Fix All People</button>
+      </div>
+
+      <div class="card status">
+        <strong>Status</strong>
+        <div id="statusText">Upload an image to start.</div>
+      </div>
+
+      <div id="groupsPanel"></div>
+    </section>
+
+    <section class="preview">
+      <div class="card">
+        <div class="canvasWrap">
+          <canvas id="previewCanvas"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <button id="downloadBtn" class="primary" disabled>Download Flattened PNG</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const imageInput = document.getElementById('imageInput');
+    const detectBtn = document.getElementById('detectBtn');
+    const fixBtn = document.getElementById('fixBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const promptInput = document.getElementById('promptInput');
+    const optionsCountInput = document.getElementById('optionsCount');
+    const resolutionInput = document.getElementById('resolution');
+    const paddingPercentInput = document.getElementById('paddingPercent');
+    const featherPixelsInput = document.getElementById('featherPixels');
+    const statusText = document.getElementById('statusText');
+    const groupsPanel = document.getElementById('groupsPanel');
+    const canvas = document.getElementById('previewCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let detector = null;
+    let originalImage = null;
+    let originalDataUrl = null;
+    let detections = [];
+    let groups = [];
+    let generatedGroups = [];
+
+    imageInput.addEventListener('change', onImageUpload);
+    detectBtn.addEventListener('click', detectPeople);
+    fixBtn.addEventListener('click', fixAllPeople);
+    downloadBtn.addEventListener('click', downloadFlattened);
+
+    async function onImageUpload(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      setStatus('Loading image...');
+      originalDataUrl = await fileToDataUrl(file);
+      originalImage = await loadImage(originalDataUrl);
+
+      canvas.width = originalImage.naturalWidth || originalImage.width;
+      canvas.height = originalImage.naturalHeight || originalImage.height;
+
+      detections = [];
+      groups = [];
+      generatedGroups = [];
+      groupsPanel.innerHTML = '';
+
+      drawOriginal();
+      detectBtn.disabled = false;
+      fixBtn.disabled = true;
+      downloadBtn.disabled = true;
+      setStatus('Image loaded. Click Detect People.');
+    }
+
+    async function detectPeople() {
+      try {
+        setStatus('Loading people detector...');
+        if (!detector) detector = await cocoSsd.load();
+
+        setStatus('Detecting people...');
+        const predictions = await detector.detect(originalImage);
+
+        detections = predictions
+          .filter(p => p.class === 'person' && p.score >= 0.45)
+          .map((p, i) => ({
+            id: `person-${i + 1}`,
+            x: p.bbox[0],
+            y: p.bbox[1],
+            width: p.bbox[2],
+            height: p.bbox[3],
+            score: p.score
+          }));
+
+        groups = groupNearbyPeople(detections);
+
+        drawDetectionPreview();
+        fixBtn.disabled = groups.length === 0;
+        setStatus(`Detected ${detections.length} people. Created ${groups.length} group crop(s).`);
+      } catch (error) {
+        setStatus(`Detection error: ${error.message || error}`);
+      }
+    }
+
+    function groupNearbyPeople(boxes) {
+      const visited = new Set();
+      const result = [];
+
+      for (let i = 0; i < boxes.length; i++) {
+        if (visited.has(i)) continue;
+
+        const stack = [i];
+        const members = [];
+        visited.add(i);
+
+        while (stack.length) {
+          const currentIndex = stack.pop();
+          const current = boxes[currentIndex];
+          members.push(current);
+
+          for (let j = 0; j < boxes.length; j++) {
+            if (visited.has(j)) continue;
+            if (shouldGroup(current, boxes[j])) {
+              visited.add(j);
+              stack.push(j);
+            }
+          }
+        }
+
+        result.push({
+          id: `group-${result.length + 1}`,
+          members,
+          box: unionBox(members)
+        });
+      }
+
+      return result;
+    }
+
+    function shouldGroup(a, b) {
+      const expand = 45;
+      const ax1 = a.x - expand;
+      const ay1 = a.y - expand;
+      const ax2 = a.x + a.width + expand;
+      const ay2 = a.y + a.height + expand;
+
+      const bx1 = b.x - expand;
+      const by1 = b.y - expand;
+      const bx2 = b.x + b.width + expand;
+      const by2 = b.y + b.height + expand;
+
+      return !(ax2 < bx1 || bx2 < ax1 || ay2 < by1 || by2 < ay1);
+    }
+
+    function unionBox(members) {
+      const x1 = Math.min(...members.map(m => m.x));
+      const y1 = Math.min(...members.map(m => m.y));
+      const x2 = Math.max(...members.map(m => m.x + m.width));
+      const y2 = Math.max(...members.map(m => m.y + m.height));
+
+      return {
+        x: Math.round(x1),
+        y: Math.round(y1),
+        width: Math.round(x2 - x1),
+        height: Math.round(y2 - y1)
+      };
+    }
+
+    async function fixAllPeople() {
+      try {
+        fixBtn.disabled = true;
+        downloadBtn.disabled = true;
+        groupsPanel.innerHTML = '';
+        setStatus('Sending crops to Magnific. Keep this tab open...');
+
+        const response = await fetch('/api/fix-people', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageDataUrl: originalDataUrl,
+            groups,
+            optionsCount: Number(optionsCountInput.value || 1),
+            prompt: promptInput.value,
+            resolution: resolutionInput.value,
+            paddingPercent: Number(paddingPercentInput.value || 40) / 100
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Server request failed.');
+        }
+
+        generatedGroups = data.groups.map(g => ({
+          ...g,
+          selectedIndex: 0
+        }));
+
+        renderGeneratedGroups();
+        await drawComposite();
+        downloadBtn.disabled = false;
+        setStatus('Done. Choose the best option for each group, then download.');
+      } catch (error) {
+        setStatus(`Generation error: ${error.message || error}`);
+      } finally {
+        fixBtn.disabled = false;
+      }
+    }
+
+    function renderGeneratedGroups() {
+      groupsPanel.innerHTML = '';
+
+      generatedGroups.forEach((group, groupIndex) => {
+        const card = document.createElement('div');
+        card.className = 'groupCard';
+
+        card.innerHTML = `
+          <div class="groupHeader">
+            <strong>${group.label}</strong>
+            <span class="meta">${group.aspectRatio} | ${group.box.width}×${group.box.height}</span>
+          </div>
+          <div class="thumbs"></div>
+        `;
+
+        const thumbs = card.querySelector('.thumbs');
+
+        group.options.forEach((option, optionIndex) => {
+          const button = document.createElement('button');
+          button.className = `thumbBtn ${optionIndex === group.selectedIndex ? 'active' : ''}`;
+          button.innerHTML = `<img src="${option}" alt="Option ${optionIndex + 1}">`;
+          button.onclick = async () => {
+            generatedGroups[groupIndex].selectedIndex = optionIndex;
+            renderGeneratedGroups();
+            await drawComposite();
+          };
+          thumbs.appendChild(button);
+        });
+
+        groupsPanel.appendChild(card);
+      });
+    }
+
+    function drawOriginal() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+    }
+
+    function drawDetectionPreview() {
+      drawOriginal();
+
+      groups.forEach((group, i) => {
+        const box = group.box;
+        ctx.strokeStyle = '#3ddb91';
+        ctx.fillStyle = 'rgba(61, 219, 145, 0.15)';
+        ctx.lineWidth = 3;
+        ctx.fillRect(box.x, box.y, box.width, box.height);
+        ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+        ctx.fillStyle = '#3ddb91';
+        ctx.font = '20px Arial';
+        ctx.fillText(`G${i + 1}`, box.x + 8, box.y + 24);
+      });
+    }
+
+    async function drawComposite() {
+      drawOriginal();
+
+      for (const group of generatedGroups) {
+        const overlay = await loadImage(group.options[group.selectedIndex]);
+
+        drawImageCoverWithFeather(
+          ctx,
+          overlay,
+          group.box.x,
+          group.box.y,
+          group.box.width,
+          group.box.height,
+          Number(featherPixelsInput.value || 0)
+        );
+
+        ctx.strokeStyle = '#76a9ff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(group.box.x, group.box.y, group.box.width, group.box.height);
+      }
+    }
+
+    function drawImageCoverWithFeather(targetCtx, image, x, y, width, height, feather) {
+      const off = document.createElement('canvas');
+      off.width = width;
+      off.height = height;
+      const offCtx = off.getContext('2d');
+
+      const iw = image.naturalWidth || image.width;
+      const ih = image.naturalHeight || image.height;
+      const scale = Math.max(width / iw, height / ih);
+      const sw = width / scale;
+      const sh = height / scale;
+      const sx = (iw - sw) / 2;
+      const sy = (ih - sh) / 2;
+
+      offCtx.drawImage(image, sx, sy, sw, sh, 0, 0, width, height);
+
+      if (feather > 0) applyRectFeather(offCtx, width, height, feather);
+
+      targetCtx.drawImage(off, x, y);
+    }
+
+    function applyRectFeather(targetCtx, width, height, feather) {
+      const f = Math.min(feather, Math.floor(width / 2), Math.floor(height / 2));
+      if (f <= 0) return;
+
+      const mask = document.createElement('canvas');
+      mask.width = width;
+      mask.height = height;
+      const m = mask.getContext('2d');
+
+      m.fillStyle = 'black';
+      m.fillRect(0, 0, width, height);
+      m.globalCompositeOperation = 'destination-in';
+
+      let gradient = m.createLinearGradient(0, 0, f, 0);
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(1, 'rgba(0,0,0,1)');
+      m.fillStyle = gradient;
+      m.fillRect(0, 0, f, height);
+
+      gradient = m.createLinearGradient(width, 0, width - f, 0);
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(1, 'rgba(0,0,0,1)');
+      m.fillStyle = gradient;
+      m.fillRect(width - f, 0, f, height);
+
+      gradient = m.createLinearGradient(0, 0, 0, f);
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(1, 'rgba(0,0,0,1)');
+      m.fillStyle = gradient;
+      m.fillRect(0, 0, width, f);
+
+      gradient = m.createLinearGradient(0, height, 0, height - f);
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(1, 'rgba(0,0,0,1)');
+      m.fillStyle = gradient;
+      m.fillRect(0, height - f, width, f);
+
+      targetCtx.globalCompositeOperation = 'destination-in';
+      targetCtx.drawImage(mask, 0, 0);
+      targetCtx.globalCompositeOperation = 'source-over';
+    }
+
+    function downloadFlattened() {
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = 'fix-people-final.png';
+      link.click();
+    }
+
+    function fileToDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = src;
+      });
+    }
+
+    function setStatus(message) {
+      statusText.textContent = message;
+    }
+  </script>
+</body>
+</html>
