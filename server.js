@@ -1,5 +1,4 @@
-# Fix People Clean Package
-
+import 'dotenv/config';
 Use this exact package.
 
 Render settings:
