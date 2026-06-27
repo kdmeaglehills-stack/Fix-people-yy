@@ -1,4 +1,18 @@
-MAGNIFIC_API_KEY=
-PUBLIC_BASE_URL=http://localhost:3000
-POLL_TIMEOUT_MS=300000
-DEFAULT_RESOLUTION=1K
+{
+  "name": "fix-people-clean",
+  "version": "1.0.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "sharp": "^0.33.5",
+    "uuid": "^11.0.5"
+  }
+}
