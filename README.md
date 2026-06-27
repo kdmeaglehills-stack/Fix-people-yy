@@ -1,0 +1,18 @@
+{
+  "name": "fix-people-clean",
+  "version": "1.0.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "sharp": "^0.33.5",
+    "uuid": "^11.0.5"
+  }
+}

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fix People - Magnific</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Fix People - Magnific</h1>
+    <p>Upload one render, detect people, generate rectangular replacement crops, choose options, and download the final image.</p>
+  </header>
+
+  <main class="layout">
+    <section class="sidebar">
+      <div class="card">
+        <label class="label">1. Upload full render</label>
+        <input type="file" id="imageInput" accept="image/png,image/jpeg,image/webp" />
+      </div>
+
+      <div class="card">
+        <label class="label">2. Prompt</label>
+        <textarea id="promptInput" rows="8">Regenerate the people in this architectural visualization crop. Preserve the same camera angle, crop framing, scale, perspective, floor contact, shadows, railing, water, architecture, and surrounding context. Improve the people only: realistic faces, natural eyes, correct hands and fingers, believable clothing folds, accurate body proportions, and natural gestures. Keep the scene photorealistic and do not redesign the environment.</textarea>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <label class="label">Options / group</label>
+          <input type="number" id="optionsCount" min="1" max="6" value="1" />
+        </div>
+        <div class="card">
+          <label class="label">Resolution</label>
+          <select id="resolution">
+            <option value="1K" selected>1K</option>
+            <option value="2K">2K</option>
+            <option value="4K">4K</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <label class="label">Crop padding %</label>
+          <input type="number" id="paddingPercent" min="5" max="100" value="40" />
+        </div>
+        <div class="card">
+          <label class="label">Edge feather px</label>
+          <input type="number" id="featherPixels" min="0" max="160" value="24" />
+        </div>
+      </div>
+
+      <div class="card note">Crop box snaps to the closest supported Nano Banana aspect ratio before generation.</div>
+
+      <div class="grid2">
+        <button id="detectBtn" class="secondary" disabled>Detect People</button>
+        <button id="fixBtn" class="primary" disabled>Fix All People</button>
+      </div>
+
+      <div class="card status">
+        <strong>Status</strong>
+        <div id="statusText">Upload an image to start.</div>
+      </div>
+
+      <div id="groupsPanel"></div>
+    </section>
+
+    <section class="preview">
+      <div class="card">
+        <div class="canvasWrap">
+          <canvas id="previewCanvas"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <button id="downloadBtn" class="primary" disabled>Download Flattened PNG</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
